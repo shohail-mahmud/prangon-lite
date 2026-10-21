@@ -8,7 +8,7 @@ import {
   ReactNode,
 } from "react";
 import { User, Session } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, supabaseConfigError } from "@/integrations/supabase/client";
 import {
   DEMO_IDENTITIES,
   DEMO_PASSWORD,
@@ -152,6 +152,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       subscription.unsubscribe();
     };
   }, [applySession]);
+
+  // Misconfigured env: fail loudly and immediately instead of hanging or
+  // rendering a blank screen (the old client.ts threw at module load, which
+  // killed React before anything could be shown).
+  useEffect(() => {
+    if (!supabaseConfigError) return;
+    setLoading(false);
+    setBootError({
+      kind: 'misconfigured',
+      title: 'Prangon Lite is not configured',
+      detail: supabaseConfigError,
+      steps: [
+        'Vercel: Project → Settings → Environment Variables.',
+        'Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY from your Supabase project.',
+        'Go to Deployments → ⋯ → Redeploy (env vars are baked in at build time).',
+      ],
+      host: undefined,
+    });
+  }, []);
 
   // Watchdog: whatever happens above, never sit on the loading screen forever.
   useEffect(() => {
