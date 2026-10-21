@@ -41,12 +41,19 @@ export function installMockBackend(getSeed: () => MockSeed): void {
   if (installed) return;
   installed = true;
 
-  const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string) ?? "";
+  // Must fall back to the SAME placeholder host the Supabase client uses
+  // (see src/integrations/supabase/client.ts). When VITE_SUPABASE_URL is unset
+  // the client still dials this host expecting the mock to answer it — but
+  // new URL("") throws, so the old code returned early and no interceptor was
+  // installed, sending those requests to the real internet.
+  const supabaseUrl =
+    (import.meta.env.VITE_SUPABASE_URL as string) ||
+    "https://your-lite-project.supabase.co";
   let host = "";
   try {
     host = new URL(supabaseUrl).host;
   } catch {
-    return; // no valid placeholder URL — nothing to intercept
+    return; // unparseable URL — nothing to intercept
   }
   if (!host || host.includes("supabase.co") === false) {
     // Only intercept the placeholder host, never a real project URL.
