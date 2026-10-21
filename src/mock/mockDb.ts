@@ -169,18 +169,18 @@ function buildTables(): Record<string, Row[]> {
     }
   });
   // Reels.
-  const reelDefs: Array<[string, string, string, number, number]> = [
+  const reelDefs: Array<[string, string, number, number, number]> = [
     ["tanvir_k", "60-second biryani trail — part 4 🍛", 1, 120, 14],
     ["ayesha_r", "Slow morning in the old city ☕", 2, 89, 6],
     ["shafin_m", "Last-over sixes compilation 🏏", 0, 210, 22],
   ];
-  reelDefs.forEach(([author, caption, vidIdx], i) => {
+  reelDefs.forEach(([author, caption, vidIdx, reelLikes, reelComments], i) => {
     const id = `r-${String(i + 1).padStart(3, "0")}`;
     posts.push({
       id,
       user_id: U[author],
       caption,
-      media_url: SAMPLE_VIDEOS[vidIdx as number],
+      media_url: SAMPLE_VIDEOS[vidIdx],
       media_type: "video",
       is_reel: true,
       is_archived: false,
