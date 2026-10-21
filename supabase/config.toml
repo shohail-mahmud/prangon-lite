@@ -1,0 +1,10 @@
+project_id = "tlknidtjixekowxmhacw"
+
+[functions.wallet-transaction]
+verify_jwt = false
+
+[functions.device-enforcement]
+verify_jwt = false
+
+[functions.send-push-notification]
+verify_jwt = false

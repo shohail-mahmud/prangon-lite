@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Prangon Lite — Menu &amp; Settings</title>
+<style>
+  :root{
+    --bg:#11131F; --surface:#1B1E2D; --indigo:#7775FF; --lavender:#B9B7FF;
+    --text:#F4F3FA; --dim:#A5A6B8; --border:rgba(185,183,255,0.12);
+    --glass:rgba(27,30,45,0.82); --glass-border:rgba(244,243,250,0.10);
+    --hi:rgba(255,255,255,0.045); --muted:#262A3D;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;padding:36px 24px 72px}
+  body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(at 12% 14%,rgba(119,117,255,.10) 0,transparent 52%),
+               radial-gradient(at 88% 22%,rgba(185,183,255,.07) 0,transparent 48%)}
+  .wrap{position:relative;z-index:1;max-width:1300px;margin:0 auto}
+  header{margin-bottom:26px;padding-bottom:18px;border-bottom:1px solid var(--border)}
+  h1{font-size:21px;font-weight:700;letter-spacing:-.02em}
+  header p{color:var(--dim);font-size:13px;margin-top:6px}
+  .grid{display:flex;flex-wrap:wrap;gap:30px;align-items:flex-start}
+  .col{display:flex;flex-direction:column;gap:22px}
+  .cap{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--dim);
+    font-weight:600;margin-bottom:9px}
+
+  /* phone */
+  .phone{width:300px;background:var(--surface);border:1px solid var(--border);
+    border-radius:26px;overflow:hidden;box-shadow:0 18px 44px -16px rgba(8,9,17,.7)}
+  .bar{display:flex;align-items:center;gap:10px;height:48px;padding:0 14px;
+    background:var(--glass);border-bottom:1px solid var(--glass-border);
+    -webkit-backdrop-filter:blur(12px) saturate(150%);backdrop-filter:blur(12px) saturate(150%)}
+  .bar h2{font-size:15px;font-weight:650}
+  .bar .ico{width:26px;height:26px;display:grid;place-items:center;color:var(--text)}
+  .body{padding:12px}
+  svg{width:18px;height:18px;stroke-width:1.8;fill:none;stroke:currentColor}
+
+  .card-prof{display:flex;align-items:center;gap:11px;padding:12px;border-radius:14px;
+    background:var(--surface);border:1px solid var(--border);margin-bottom:14px}
+  .av{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#7775FF,#B9B7FF);
+    display:grid;place-items:center;font-weight:700;color:#11131F;font-size:16px;flex:0 0 auto}
+  .av.sm{width:34px;height:34px;font-size:13px}
+  .who b{display:block;font-size:13.5px;font-weight:650}
+  .who small{color:var(--dim);font-size:11.5px}
+
+  .row{display:flex;align-items:center;gap:12px;padding:10px;border-radius:12px;
+    transition:background .15s}
+  .row:hover{background:rgba(185,183,255,.06)}
+  .row .box{width:36px;height:36px;border-radius:11px;background:var(--muted);
+    display:grid;place-items:center;color:var(--text);flex:0 0 auto}
+  .row .lab{flex:1;min-width:0}
+  .row .lab b{display:block;font-size:13px;font-weight:600}
+  .row .lab small{color:var(--dim);font-size:11px}
+  .chev{width:16px;height:16px;color:rgba(165,166,184,.6);flex:0 0 auto}
+
+  .lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);
+    font-weight:650;padding:12px 10px 5px}
+  .note{padding:0 10px 8px;font-size:11px;color:var(--dim);line-height:1.55}
+  .sep{height:1px;background:var(--border);margin:10px 0 2px}
+
+  .radio{width:16px;height:16px;border-radius:50%;border:1px solid rgba(165,166,184,.4);
+    flex:0 0 auto;display:grid;place-items:center}
+  .radio.on{border-color:var(--indigo);color:var(--indigo)}
+  .radio.on::after{content:'';width:7px;height:7px;border-radius:50%;background:var(--indigo)}
+  .sel{background:rgba(119,117,255,.10)}
+
+  .chip{display:flex;align-items:center;gap:11px;padding:11px;border-radius:12px;
+    border:2px solid var(--indigo);background:rgba(119,117,255,.05)}
+  .sw{width:34px;height:34px;border-radius:10px;flex:0 0 auto;
+    background:linear-gradient(135deg,#7775FF,#B9B7FF)}
+  .lang{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:6px}
+  .lang div{padding:9px 10px;border-radius:11px;border:2px solid var(--border);font-size:12px}
+  .lang div.on{border-color:var(--indigo);background:rgba(119,117,255,.05)}
+  .lang small{display:block;color:var(--dim);font-size:10px;margin-top:1px}
+  .btn-sm{padding:6px 12px;border-radius:9px;border:1px solid var(--glass-border);
+    background:transparent;color:var(--text);font-size:11.5px;font-weight:600;cursor:pointer}
+  .foot{text-align:center;padding:14px 0 6px}
+  .foot p{font-size:10.5px;color:var(--dim)}
+  .foot p.sm{font-size:9.5px;opacity:.75;margin-top:3px}
+
+  .legend{margin-top:34px;padding-top:20px;border-top:1px solid var(--border);
+    display:grid;grid-template-columns:1fr 1fr;gap:26px}
+  .legend h3{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);
+    margin-bottom:10px;font-weight:650}
+  .legend ul{list-style:none;font-size:12.5px;line-height:1.85}
+  .legend li.out{color:var(--dim);text-decoration:line-through}
+  .legend li.in::before{content:'✓ ';color:var(--indigo);font-weight:700}
+  .legend li.out::before{content:'✕ '}
+  @media(max-width:900px){.legend{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Prangon Lite — Menu &amp; Settings</h1>
+    <p>Menu cut to four destinations; Settings consolidated into Account, Appearance, Safety and About &amp; Support.</p>
+  </header>
+
+  <div class="grid">
+
+    <!-- MENU -->
+    <div class="col">
+      <div class="cap">Menu</div>
+      <div class="phone">
+        <div class="bar">
+          <span class="ico"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 18l-6-6 6-6"/></svg></span>
+          <h2>Menu</h2>
+        </div>
+        <div class="body">
+          <div class="card-prof">
+            <div class="av">A</div>
+            <div class="who"><b>Arafat Hossain</b><small>@arafat</small></div>
+            <svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+          </div>
+
+          <div class="row"><div class="box"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-4.5A8 8 0 0 1 11 4h2a8 8 0 0 1 8 8Z"/></svg></div>
+            <div class="lab"><b>Messages</b><small>Your conversations</small></div><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div>
+
+          <div class="row"><div class="box"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
+            <div class="lab"><b>Notifications</b><small>Your alerts</small></div><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div>
+
+          <div class="row"><div class="box"><svg viewBox="0 0 24 24"><path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 21l8.8-8.3a5 5 0 0 0 0-7.1Z"/></svg></div>
+            <div class="lab"><b>Followers</b><small>Followers and following</small></div><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div>
+
+          <div class="row"><div class="box"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 4.6 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 11 4.6a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 19.4 11a2 2 0 1 1 0 4Z"/></svg></div>
+            <div class="lab"><b>Settings</b><small>Account, appearance, safety</small></div><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div>
+
+          <div class="sep"></div>
+          <div class="lbl">Demo session</div>
+          <div class="row"><div class="box"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg></div>
+            <div class="lab"><b>Reset demo session</b><small>Returns to Demo User A</small></div></div>
+
+          <div class="foot"><p>Prangon Lite v1.0.0</p><p class="sm">© Prangon</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS MAIN -->
+    <div class="col">
+      <div class="cap">Settings — main</div>
+      <div class="phone">
+        <div class="bar">
+          <span class="ico"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 18l-6-6 6-6"/></svg></span>
+          <h2>Settings</h2>
+        </div>
+        <div class="body">
+          <div class="row"><div class="box"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+            <div class="lab"><b>Account</b><small>Profile, email, visibility</small></div><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div>
+
+          <div class="row"><div class="box"><svg viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.6-.7 1.6-1.6 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.6 1.6-1.6H16c2.8 0 5-2.2 5-5C21 6.5 16.5 2 12 2Z"/></svg></div>
+            <div class="lab"><b>Appearance</b><small>Theme and language</small></div><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div>
+
+          <div class="row"><div class="box"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg></div>
+            <div class="lab"><b>Safety</b><small>Blocked users and reporting</small></div><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div>
+
+          <div class="row"><div class="box"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></div>
+            <div class="lab"><b>About &amp; Support</b><small>Help, guidelines, terms</small></div><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div>
+
+          <div class="sep"></div>
+          <div class="lbl">Demo session</div>
+          <p class="note">Lite runs on a shared demo identity, so there is no password, no two-factor setup, and no account to delete.</p>
+
+          <div class="row sel"><div class="radio on"></div>
+            <div class="lab"><b>Demo User A</b><small>@demo_a</small></div></div>
+          <div class="row"><div class="radio"></div>
+            <div class="lab"><b>Demo User B</b><small>@demo_b</small></div></div>
+          <div class="row"><div class="radio"></div>
+            <div class="lab"><b>Demo User C</b><small>@demo_c</small></div></div>
+
+          <div class="row"><div class="box"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg></div>
+            <div class="lab"><b>Reset demo session</b><small>Return to Demo User A</small></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACCOUNT + APPEARANCE -->
+    <div class="col">
+      <div class="cap">Account</div>
+      <div class="phone">
+        <div class="bar"><span class="ico"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 18l-6-6 6-6"/></svg></span><h2>Account</h2></div>
+        <div class="body">
+          <div class="lbl">Profile</div>
+          <div class="row"><div class="box"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+            <div class="lab"><b>Edit profile</b><small>Name, username, bio and photo</small></div><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div>
+
+          <div class="lbl">Account details</div>
+          <div class="row"><div class="box"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></div>
+            <div class="lab"><b>Email</b><small>demo_a@prangon.lite</small></div></div>
+
+          <div class="lbl">Privacy &amp; visibility</div>
+          <p class="note">All Prangon Lite profiles are public — anyone can see posts and follow instantly. There is no private-account mode in Lite.</p>
+        </div>
+      </div>
+
+      <div class="cap">Appearance</div>
+      <div class="phone">
+        <div class="bar"><span class="ico"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 18l-6-6 6-6"/></svg></span><h2>Appearance</h2></div>
+        <div class="body">
+          <div class="lbl">Theme</div>
+          <div class="chip">
+            <div class="sw"></div>
+            <div class="lab"><b>Midnight Indigo</b><small>The only theme in Lite</small></div>
+            <svg style="color:var(--indigo)" viewBox="0 0 24 24"><path d="m20 6-11 11-5-5"/></svg>
+          </div>
+
+          <div class="lbl">Language</div>
+          <div class="lang">
+            <div class="on">English<small>English</small></div>
+            <div>বাংলা<small>Bengali</small></div>
+            <div>Español<small>Spanish</small></div>
+            <div>Français<small>French</small></div>
+            <div>العربية<small>Arabic</small></div>
+            <div>हिंदी<small>Hindi</small></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SAFETY + ABOUT -->
+    <div class="col">
+      <div class="cap">Safety</div>
+      <div class="phone">
+        <div class="bar"><span class="ico"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 18l-6-6 6-6"/></svg></span><h2>Safety</h2></div>
+        <div class="body">
+          <div class="lbl">Blocked users</div>
+          <div class="row">
+            <div class="av sm">R</div>
+            <div class="lab"><b>Rahim Ahmed</b><small>@rahim</small></div>
+            <button class="btn-sm">Unblock</button>
+          </div>
+          <div class="row">
+            <div class="av sm">S</div>
+            <div class="lab"><b>Sadia Islam</b><small>@sadia</small></div>
+            <button class="btn-sm">Unblock</button>
+          </div>
+
+          <div class="lbl">Reporting</div>
+          <div class="row"><div class="box"><svg viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1Z"/><path d="M4 22v-7"/></svg></div>
+            <div class="lab"><b>Report a problem</b><small>Report bugs, issues, or violations</small></div><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div>
+        </div>
+      </div>
+
+      <div class="cap">About &amp; Support</div>
+      <div class="phone">
+        <div class="bar"><span class="ico"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 18l-6-6 6-6"/></svg></span><h2>About &amp; Support</h2></div>
+        <div class="body">
+          <div class="lbl">Support</div>
+          <div class="row"><div class="box"><svg viewBox="0 0 24 24"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3ZM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3Z"/></svg></div>
+            <div class="lab"><b>Contact support</b><small>Get help from our team</small></div><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div>
+
+          <div class="lbl">Information</div>
+          <div class="row"><div class="box"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg></div>
+            <div class="lab"><b>Community guidelines</b><small>Our community standards</small></div><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div>
+          <div class="row"><div class="box"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></div>
+            <div class="lab"><b>About Prangon Lite</b><small>Version and app info</small></div><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div>
+
+          <div class="lbl">Legal</div>
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px 2px;font-size:13px;font-weight:650">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+            Privacy &amp; Terms
+          </div>
+          <p class="note" style="padding-top:6px">Full policy text renders inline here (PrivacyTerms component).</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="legend">
+    <div>
+      <h3>Removed from Menu</h3>
+      <ul>
+        <li class="out">Groups</li><li class="out">Reels</li><li class="out">Live</li>
+        <li class="out">Pages &amp; Communities (Lab)</li><li class="out">Activity Log</li>
+        <li class="out">Memories</li><li class="out">Starred</li><li class="out">Gaming</li>
+        <li class="out">Archive</li><li class="out">Help &amp; Support <span style="opacity:.7">(→ Settings)</span></li>
+        <li class="out">Legal &amp; Information section</li>
+        <li class="out">Menu search bar</li>
+        <li class="out">Share / Copy-link / Feedback quick row</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Removed from Settings</h3>
+      <ul>
+        <li class="out">Verification request flow</li>
+        <li class="out">Two-factor authentication toggle</li>
+        <li class="out">Devices &amp; login activity</li>
+        <li class="out">Password &amp; email change</li>
+        <li class="out">Push / email notification preferences</li>
+        <li class="out">Sound &amp; vibration</li>
+        <li class="out">Data &amp; storage, cache, export</li>
+        <li class="out">Muted users (no implementation)</li>
+        <li class="out">Delete account / Danger zone</li>
+        <li class="in">Account, Appearance, Safety, About &amp; Support</li>
+        <li class="in">Demo session: switch identity + reset</li>
+        <li class="in">Blocked users with working unblock</li>
+        <li class="in">Language (real i18n + user_settings)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+</body>
+</html>

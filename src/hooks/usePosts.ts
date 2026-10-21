@@ -1,0 +1,176 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import { validateMediaFile, isVideo, MAX_VIDEO_LABEL } from "@/lib/mediaLimits";
+
+export interface PostMedia {
+  id: string;
+  media_url: string;
+  media_type: string;
+  display_order: number;
+}
+
+export interface Post {
+  id: string;
+  user_id: string;
+  caption: string | null;
+  media_url: string | null;
+  media_type: string | null;
+  likes_count: number;
+  comments_count: number;
+  is_reel: boolean;
+  created_at: string;
+  profiles: {
+    username: string;
+    display_name: string | null;
+    avatar_url: string | null;
+    is_verified: boolean;
+    profile_theme?: string | null;
+  };
+  post_media?: PostMedia[];
+}
+
+export const usePosts = (isReel = false) => {
+  return useQuery({
+    queryKey: ["posts", isReel],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("posts")
+        .select(`
+          *,
+          profiles:user_id (
+            username,
+            display_name,
+            avatar_url,
+            is_verified,
+            profile_theme
+          ),
+          post_media (
+            id,
+            media_url,
+            media_type,
+            display_order
+          )
+        `)
+        .eq("is_reel", isReel)
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+      
+      return (data as Post[]).map((post) => ({
+        ...post,
+        post_media: post.post_media?.sort((a, b) => a.display_order - b.display_order) || [],
+      }));
+    },
+  });
+};
+
+export const useUserPosts = (userId: string) => {
+  return useQuery({
+    queryKey: ["user-posts", userId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("posts")
+        .select(`
+          *,
+          profiles:user_id (
+            username,
+            display_name,
+            avatar_url,
+            is_verified,
+            profile_theme
+          ),
+          post_media (
+            id,
+            media_url,
+            media_type,
+            display_order
+          )
+        `)
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      
+      return (data as Post[]).map((post) => ({
+        ...post,
+        post_media: post.post_media?.sort((a, b) => a.display_order - b.display_order) || [],
+      }));
+    },
+    enabled: !!userId,
+  });
+};
+
+/**
+ * Videos go to `post-videos` (which carries the hard 20 MiB bucket limit);
+ * images stay in `post-media`. Validating here is only so the user gets a
+ * clear message before uploading — the bucket limit is the real boundary.
+ */
+const bucketFor = (file: File) => (isVideo(file) ? "post-videos" : "post-media");
+
+const assertUploadable = (files: File[]) => {
+  for (const file of files) {
+    const result = validateMediaFile(file);
+    if (!result.ok) throw new Error(result.message);
+  }
+};
+
+export const useCreatePost = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      caption,
+      files,
+      isReel = false,
+    }: {
+      caption: string;
+      files?: File[];
+      isReel?: boolean;
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      if (files?.length) assertUploadable(files);
+
+      let media_url = null;
+      let media_type = null;
+      if (files && files.length > 0) {
+        const firstFile = files[0];
+        const fileExt = firstFile.name.split(".").pop();
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+        const bucket = bucketFor(firstFile);
+        const { error: uploadError } = await supabase.storage.from(bucket).upload(fileName, firstFile);
+        if (uploadError) throw uploadError;
+        const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(fileName);
+        media_url = publicUrl;
+        media_type = isVideo(firstFile) ? "video" : "image";
+      }
+      const { data: post, error } = await supabase.from("posts").insert({ user_id: user.id, caption, media_url, media_type, is_reel: isReel }).select().single();
+      if (error) throw error;
+      if (files && files.length > 1) {
+        const mediaInserts = await Promise.all(files.slice(1).map(async (file, index) => {
+          const fileExt = file.name.split(".").pop();
+          const fileName = `${user.id}/${Date.now()}-${index + 1}.${fileExt}`;
+          const bucket = bucketFor(file);
+          const { error: uploadError } = await supabase.storage.from(bucket).upload(fileName, file);
+          if (uploadError) throw uploadError;
+          const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(fileName);
+          return { post_id: post.id, media_url: publicUrl, media_type: isVideo(file) ? "video" : "image", display_order: index + 1 };
+        }));
+        const firstMediaInsert = { post_id: post.id, media_url: media_url!, media_type: media_type!, display_order: 0 };
+        await supabase.from("post_media").insert([firstMediaInsert, ...mediaInserts]);
+      } else if (files && files.length === 1) {
+        await supabase.from("post_media").insert({ post_id: post.id, media_url: media_url!, media_type: media_type!, display_order: 0 });
+      }
+      return post;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      toast({ title: "Success", description: "Post created successfully!" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+};

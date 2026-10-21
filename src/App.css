@@ -1,0 +1,14 @@
+/* Prangon - App root reset 
+   Previously contained Vite template styles that broke layout (max-width, centered text, logo spin).
+   Now minimal, safe.
+*/
+#root {
+  min-height: 100vh;
+  width: 100%;
+  isolation: isolate;
+}
+
+/* Smooth app loading */
+#root:empty {
+  background: hsl(var(--background));
+}
