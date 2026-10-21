@@ -19,6 +19,7 @@ import {
   isDemoEmail,
   storeIdentityId,
 } from "@/lib/demoAccounts";
+import { describeBootFailure, type BootDiagnosis } from "@/lib/bootDiagnostics";
 
 interface AuthContextType {
   user: User | null;
@@ -33,6 +34,9 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+/** Give up rather than spinning forever. */
+const BOOT_TIMEOUT_MS = 15000;
 
 /**
  * Signs in as a seeded demo account. Uses a real Supabase session so that
@@ -54,41 +58,71 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [demoIdentityId, setDemoIdentityId] =
     useState<DemoIdentityId | null>(null);
-  const [bootError, setBootError] = useState<string | null>(null);
+  const [bootError, setBootError] = useState<BootDiagnosis | null>(null);
 
-  // Guards against duplicate sign-in attempts (StrictMode double-mount,
-  // rapid token refresh, or a user hammering the identity switcher).
+  // Guards against duplicate sign-in attempts (rapid token refresh, or a user
+  // hammering the identity switcher).
   const signingIn = useRef(false);
+
+  const applySession = useCallback((next: Session | null) => {
+    setSession(next);
+    setUser(next?.user ?? null);
+    setDemoIdentityId(
+      next?.user?.email ? (identityFromEmail(next.user.email)?.id ?? null) : null,
+    );
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
     const ensureDemoSession = async () => {
-      if (signingIn.current) return;
-      const { data } = await supabase.auth.getSession();
-      const existing = data.session;
-
-      // Already signed in as an allowed demo account — reuse it.
-      if (existing?.user?.email && isDemoEmail(existing.user.email)) {
-        if (cancelled) return;
-        setSession(existing);
-        setUser(existing.user);
-        setDemoIdentityId(identityFromEmail(existing.user.email)?.id ?? null);
+      // Claim the slot BEFORE awaiting. The old code checked the flag, then
+      // awaited getSession(), then set the flag — so two runs could both get
+      // past the check and the second returned early WITHOUT clearing
+      // `loading`, leaving the app on the spinner forever.
+      if (signingIn.current) {
         setLoading(false);
         return;
       }
-
-      // Otherwise sign in as the selected (or default) demo identity.
       signingIn.current = true;
+
       try {
+        const { data } = await supabase.auth.getSession();
+        const existing = data.session;
+
+        // Already signed in as an allowed demo account — reuse it.
+        if (existing?.user?.email && isDemoEmail(existing.user.email)) {
+          if (cancelled) return;
+          applySession(existing);
+          return;
+        }
+
         await signInAsDemo(getStoredIdentityId());
-      } catch (err) {
-        if (!cancelled) {
+        if (cancelled) return;
+
+        // THE FIX: do not rely on onAuthStateChange to clear `loading`.
+        // If that event never fires, the old code hung on the spinner forever.
+        // Re-read the session and finish the boot ourselves.
+        const { data: after } = await supabase.auth.getSession();
+        if (after.session?.user) {
+          applySession(after.session);
+        } else {
+          setLoading(false);
           setBootError(
-            err instanceof Error
-              ? err.message
-              : "Could not sign in to the demo account",
+            describeBootFailure(
+              new Error(
+                "Sign-in reported success but no session was returned.",
+              ),
+            ),
           );
+        }
+      } catch (err) {
+        console.error("[Prangon Lite] demo sign-in failed:", err);
+        if (!cancelled) {
+          // Diagnose the real cause — a network failure and a missing seed
+          // need different fixes, so they must not share a message.
+          setBootError(describeBootFailure(err));
           setLoading(false);
         }
       } finally {
@@ -100,10 +134,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (cancelled) return;
+      // Keep state in sync, but never rely on this alone to finish booting.
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
       setDemoIdentityId(
-        identityFromEmail(nextSession?.user?.email)?.id ?? null,
+        nextSession?.user?.email
+          ? (identityFromEmail(nextSession.user.email)?.id ?? null)
+          : null,
       );
       setLoading(false);
     });
@@ -114,7 +151,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [applySession]);
+
+  // Watchdog: whatever happens above, never sit on the loading screen forever.
+  useEffect(() => {
+    if (!loading) return;
+    const timer = setTimeout(() => {
+      setLoading(false);
+      setBootError((current) =>
+        current ??
+        {
+          kind: "unknown",
+          title: "Startup timed out",
+          detail:
+            "The app could not finish signing in within 15 seconds. This is usually a network or configuration problem, not a missing seed.",
+          steps: [
+            "Open the browser console (F12) and look for the error above.",
+            "Run connection-check.html to test the project directly.",
+            "Check the Supabase dashboard — a paused project causes exactly this.",
+          ],
+          host: undefined,
+        },
+      );
+    }, BOOT_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [loading]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -124,8 +185,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // demo identity rather than leaving the app in a signed-out state.
     try {
       await signInAsDemo(getStoredIdentityId());
+      const { data } = await supabase.auth.getSession();
+      applySession(data.session);
     } catch {
-      /* leave signed out if the demo accounts are unavailable */
+      setLoading(false);
     }
   };
 
@@ -137,11 +200,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await supabase.auth.signOut();
       await signInAsDemo(id);
+      const { data } = await supabase.auth.getSession();
+      applySession(data.session);
+    } catch (err) {
+      setBootError(describeBootFailure(err));
+      setLoading(false);
     } finally {
       signingIn.current = false;
-      setLoading(false);
     }
-  }, []);
+  }, [applySession]);
 
   return (
     <AuthContext.Provider
@@ -157,17 +224,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     >
       {bootError && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-background p-6">
-          <div className="max-w-md rounded-lg border border-destructive/40 bg-destructive/10 p-5 text-sm">
-            <h1 className="mb-2 font-semibold text-destructive">
-              Prangon Lite demo accounts are not set up
+          <div className="max-w-lg rounded-xl border border-destructive/40 bg-destructive/10 p-6 text-sm">
+            <h1 className="mb-2 text-base font-semibold text-destructive">
+              {bootError.title}
             </h1>
-            <p className="text-muted-foreground">
-              {bootError}
-            </p>
-            <p className="mt-3 text-muted-foreground">
-              Run the Lite seed migration to create demo_a / demo_b / demo_c,
-              then reload. See LITE_SETUP.md.
-            </p>
+
+            <p className="text-muted-foreground">{bootError.detail}</p>
+
+            {bootError.host && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Project host:{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5 font-mono">
+                  {bootError.host}
+                </code>
+              </p>
+            )}
+
+            <ol className="mt-4 list-decimal space-y-1.5 pl-5 text-muted-foreground">
+              {bootError.steps.map((step, i) => (
+                <li key={i}>{step}</li>
+              ))}
+            </ol>
+
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-[hsl(var(--primary-hover))]"
+            >
+              Retry
+            </button>
           </div>
         </div>
       )}
