@@ -42,9 +42,9 @@ export const PEOPLE: Row[] = [
 const U = Object.fromEntries(PEOPLE.map((p) => [p.username, p.id])) as Record<string, string>;
 
 const SAMPLE_VIDEOS = [
-  "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
-  "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
-  "https://media.w3.org/2010/05/sintel/trailer.mp4",
+  "https://test-videos.co.uk/vids/bigbuckbunny/webm/vp9/360/Big_Buck_Bunny_360_10s_1MB.webm",
+  "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.webm",
+  "https://test-videos.co.uk/vids/jellyfish/webm/vp9/360/Jellyfish_360_10s_1MB.webm",
 ];
 
 export function createSeed(): MockSeed {
