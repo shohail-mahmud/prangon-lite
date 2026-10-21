@@ -53,7 +53,7 @@ export const SplashScreen = ({ onComplete }: SplashScreenProps) => {
         {/* Logo */}
         <motion.img
           src={prangonLogo}
-          alt="Prangon"
+          alt="Prangon Lite"
           className="h-24 mx-auto mb-4 drop-shadow-2xl"
           width="96"
           height="96"
@@ -63,6 +63,16 @@ export const SplashScreen = ({ onComplete }: SplashScreenProps) => {
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.2, duration: 0.5, ease: "easeOut" }}
         />
+
+        {/* Lite mark — keeps the original Prangon mark, adds the Lite name */}
+        <motion.span
+          className="mx-auto -mt-1 mb-3 flex w-fit items-center rounded-full bg-primary/12 px-2.5 py-[3px] text-[10px] font-bold uppercase tracking-[0.18em] text-primary"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.42, duration: 0.3, ease: "easeOut" }}
+        >
+          Lite
+        </motion.span>
 
         {/* Tagline */}
         <motion.p
