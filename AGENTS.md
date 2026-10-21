@@ -5,3 +5,5 @@
 - Wrapped PNG exports use a dedicated on-device canvas renderer with shared CSS color tokens and optional-image fallbacks; this keeps export logic separate from the photocard editor and avoids uploads.
 ## Lovable workspace
 - This project was imported as a Vite + React 18 SPA (react-router-dom v6, Tailwind v3). It is intentionally NOT on the TanStack Start template; do not migrate routing, SSR, or server functions here unless the user asks. Preview runs `vite` on port 8080 (same as the Lovable dev server).
+
+- Demo data layer: src/mock/ intercepts the Supabase client in the browser when VITE_USE_MOCK_DATA=true (in .env). App code untouched; no database contacted. Seed + writes live in localStorage; window.__prangonResetMockData() reseeds. Do not enable it against a real Supabase URL.
