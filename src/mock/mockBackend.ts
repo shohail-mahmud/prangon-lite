@@ -308,17 +308,12 @@ async function handleRest(
   }
 
   const table = decodeURIComponent(path.split("?")[0]);
-  const rows = ctx.tables[table];
+  let rows = ctx.tables[table];
   if (!rows) {
-    return jsonResponse(
-      {
-        code: "42P01",
-        message: `relation "public.${table}" does not exist (mock)`,
-        details: null,
-        hint: null,
-      },
-      404,
-    );
+    // Unknown table: treat as empty instead of erroring so secondary
+    // features degrade gracefully in mock mode.
+    rows = [];
+    ctx.tables[table] = rows;
   }
 
   const params = url.searchParams;
@@ -413,30 +408,33 @@ async function handleRest(
 // ------------------------------------------------------------------ filters
 
 type Filter = { column: string; op: string; value: string };
+type FilterSet = { filters: Filter[]; orGroups: Filter[][] };
 
-function parseFilters(params: URLSearchParams): Filter[] {
+function parseFilters(params: URLSearchParams): FilterSet {
   const reserved = new Set([
     "select", "order", "limit", "offset", "on_conflict", "columns",
   ]);
-  const filters: Filter[] = [];
+  const set: FilterSet = { filters: [], orGroups: [] };
   params.forEach((rawValue, key) => {
     if (reserved.has(key)) return;
     const value = decodeURIComponent(rawValue);
     if (key === "or") {
       // Minimal support: or=(col.eq.v,col.eq.v)
+      const group: Filter[] = [];
       const inner = value.replace(/^\(|\)$/g, "");
       for (const clause of inner.split(",")) {
-        const m = clause.match(/^([a-zA-Z0-9_.]+)\.(eq|neq|is)\.(.*)$/);
-        if (m) filters.push({ column: m[1], op: `or.${m[2]}`, value: m[3] });
+        const m = clause.match(/^([a-zA-Z0-9_.]+)\.(eq|neq|is|in|gte|lte|gt|lt|like|ilike)\.(.*)$/s);
+        if (m) group.push({ column: m[1], op: m[2], value: m[3] });
       }
+      if (group.length) set.orGroups.push(group);
       return;
     }
     const m = value.match(/^(eq|neq|gt|gte|lt|lte|like|ilike|is|in|cs|cd|ov)\.(.*)$/s);
     if (m) {
-      filters.push({ column: key, op: m[1], value: m[2] });
+      set.filters.push({ column: key, op: m[1], value: m[2] });
     }
   });
-  return filters;
+  return set;
 }
 
 function compare(a: any, b: any): number {
@@ -451,21 +449,14 @@ function compare(a: any, b: any): number {
   return String(a).localeCompare(String(b));
 }
 
-function matchesFilters(row: Row, filters: Filter[]): boolean {
-  return filters.every((f) => {
-    const cell = row[f.column];
-    const v = f.value;
-    const orMode = f.op.startsWith("or.");
-    const op = orMode ? f.op.slice(3) : f.op;
-    const hit = matchOne(cell, op, v);
-    if (orMode && hit) return true;
-    if (orMode) {
-      // For `or`, at least one clause must match; track via special marker.
-      (row as any).__orMatched = (row as any).__orMatched || hit;
-      return true;
-    }
-    return hit;
-  });
+function matchesFilters(row: Row, set: FilterSet): boolean {
+  for (const f of set.filters) {
+    if (!matchOne(row[f.column], f.op, f.value)) return false;
+  }
+  for (const group of set.orGroups) {
+    if (!group.some((f) => matchOne(row[f.column], f.op, f.value))) return false;
+  }
+  return true;
 }
 
 function matchOne(cell: any, op: string, rawValue: string): boolean {
