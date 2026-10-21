@@ -1,16 +1,15 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNotifications } from "@/hooks/useNotifications";
 import {
   Heart, MessageCircle, UserPlus, Eye, Bell, UserCircle, AtSign, Settings, Send,
-  CheckCircle, Star, Users, Megaphone, ThumbsUp, Reply,
+  Star, Users, Megaphone, ThumbsUp, Reply,
 } from "lucide-react";
 import { formatDistanceToNow, isToday, isThisWeek } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -22,6 +21,7 @@ const getIcon = (type: string) => {
       return <MessageCircle className="h-4 w-4 text-blue-500" />;
     case "comment_reply":
       return <Reply className="h-4 w-4 text-blue-400" />;
+    case "follow":
     case "friend_request":
     case "follow_request":
       return <UserPlus className="h-4 w-4 text-emerald-500" />;
@@ -57,6 +57,7 @@ const getCategory = (type: string): "social" | "messages" | "system" => {
     case "like":
     case "comment":
     case "comment_reply":
+    case "follow":
     case "friend_request":
     case "follow_request":
     case "friend_accept":
@@ -92,11 +93,17 @@ const TIME_GROUP_LABELS: Record<TimeGroup, string> = {
 };
 
 export const NotificationsList = () => {
-  const { notifications, isLoading, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, isLoading, markAllAsRead } = useNotifications();
+
+  // Instagram behaviour: opening the page clears the ping. No manual button —
+  // viewing IS the trigger.
+  useEffect(() => {
+    if (!isLoading) markAllAsRead.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading]);
   const navigate = useNavigate();
 
   const handleNotificationClick = (notification: any) => {
-    markAsRead.mutate(notification.id);
     if (notification.action_url) {
       navigate(notification.action_url);
     }
@@ -146,6 +153,9 @@ export const NotificationsList = () => {
             {getIcon(notification.type)}
           </div>
         </div>
+        {!notification.is_read && (
+          <span className="w-2 h-2 bg-primary rounded-full shrink-0 mt-3.5" />
+        )}
         <div className="flex-1 min-w-0 pt-0.5">
           <p className="text-[14px] leading-snug">
             <span className={cn(!notification.is_read ? "font-bold" : "font-semibold")}>
@@ -157,9 +167,6 @@ export const NotificationsList = () => {
             {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
           </p>
         </div>
-        {!notification.is_read && (
-          <span className="w-2 h-2 bg-primary rounded-full shrink-0 mt-3.5" />
-        )}
       </button>
     </motion.div>
   );
@@ -203,25 +210,6 @@ export const NotificationsList = () => {
 
   return (
     <div className="space-y-3">
-      {/* Header actions */}
-      {unreadCount > 0 && (
-        <div className="flex items-center justify-between px-1">
-          <Badge variant="default" className="px-2.5 py-0.5 rounded-full text-xs">
-            {unreadCount} unread
-          </Badge>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => markAllAsRead.mutate()}
-            disabled={markAllAsRead.isPending}
-            className="text-xs text-primary"
-          >
-            <CheckCircle className="h-3.5 w-3.5 mr-1" />
-            Mark all read
-          </Button>
-        </div>
-      )}
-
       {notifications.length === 0 ? (
         <div className="text-center py-16">
           <div className="w-20 h-20 rounded-full bg-muted/60 flex items-center justify-center mx-auto mb-4">
