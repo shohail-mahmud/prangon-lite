@@ -1,9 +1,11 @@
-# Roadmap
+# Anniversary edition
+## Missing-profile fixes
+- [ ] Prevent empty handles throughout the app.
+- [ ] Recover the signed-in user's missing profile automatically.
+- [ ] Show readable missing-profile action errors and run focused checks.
 
-## Done
-- [x] Phase 1 — Import Prangon project (prangon-lite.zip) into the Lovable project as-is; dependencies installed; dev server runs; verified pages render in a test browser.
-  - Files changed: replaced template scaffolding with the imported project (package.json, vite.config.ts, tsconfig*, tailwind.config.ts, index.html, src/, public/, supabase/, docs). Added `.env` from `.env.example` (placeholder values, no database connected). Fixed one import blocker: moved `<DemoIdentitySwitcher />` inside `<AuthProvider>` in `src/App.tsx` (it crashed the app when rendered).
-
-## Pending
-- [ ] Phase 2 — Prangon Lite redesign: waiting on the user's explicit instructions (per the setup brief; no redesign before then).
-- [ ] Backend data (optional, user decision): point VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY at a real Lite Supabase project to make data-backed features work. Blocked on user — they asked for no database connection for now.
+- [x] Replace Wrapped text recap with a personalized PNG; canvas/download/share checks passed. Signed-in page check unavailable with external unmanaged authentication.
+- [ ] Redesign the anniversary page and announcement.
+- [ ] Implement earned collectibles and profile display.
+- [ ] Add real personal Wrapped and private sealed Time Capsule.
+- [ ] Test eligibility, event expiry, and available user flows.
