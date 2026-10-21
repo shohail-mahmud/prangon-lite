@@ -442,7 +442,7 @@ function parseFilters(params: URLSearchParams): FilterSet {
   const set: FilterSet = { filters: [], orGroups: [] };
   params.forEach((rawValue, key) => {
     if (reserved.has(key)) return;
-    const value = decodeURIComponent(rawValue);
+    const value = rawValue;
     if (key === "or") {
       // Minimal support: or=(col.eq.v,col.eq.v)
       const group: Filter[] = [];
@@ -454,9 +454,15 @@ function parseFilters(params: URLSearchParams): FilterSet {
       if (group.length) set.orGroups.push(group);
       return;
     }
-    const m = value.match(/^(eq|neq|gt|gte|lt|lte|like|ilike|is|in|cs|cd|ov)\.(.*)$/s);
+    let negate = false;
+    let v = value;
+    if (v.startsWith("not.")) {
+      negate = true;
+      v = v.slice(4);
+    }
+    const m = v.match(/^(eq|neq|gt|gte|lt|lte|like|ilike|is|in|cs|cd|ov)\.(.*)$/s);
     if (m) {
-      set.filters.push({ column: key, op: m[1], value: m[2] });
+      set.filters.push({ column: key, op: negate ? `not.${m[1]}` : m[1], value: m[2] });
     }
   });
   return set;
@@ -476,6 +482,10 @@ function compare(a: any, b: any): number {
 
 function matchesFilters(row: Row, set: FilterSet): boolean {
   for (const f of set.filters) {
+    if (f.op.startsWith("not.")) {
+      if (matchOne(row[f.column], f.op.slice(4), f.value)) return false;
+      continue;
+    }
     if (!matchOne(row[f.column], f.op, f.value)) return false;
   }
   for (const group of set.orGroups) {

@@ -96,6 +96,20 @@ function buildAuthUsers(): Record<string, Row> {
   return users;
 }
 
+// Follower/following counts derived from the follow pairs seeded in buildTables.
+const FOLLOW_PAIRS: Array<[string, string]> = [
+  ["demo_a", "ayesha_r"], ["demo_a", "tanvir_k"], ["demo_a", "mira_p"],
+  ["demo_a", "demo_b"], ["demo_a", "demo_c"],
+  ["ayesha_r", "demo_a"], ["tanvir_k", "demo_a"], ["demo_b", "demo_a"],
+  ["shafin_m", "demo_b"], ["nusrat_j", "ayesha_r"],
+];
+const FOLLOWERS: Record<string, number> = {};
+const FOLLOWING: Record<string, number> = {};
+for (const [a, b] of FOLLOW_PAIRS) {
+  FOLLOWERS[b] = (FOLLOWERS[b] ?? 0) + 1;
+  FOLLOWING[a] = (FOLLOWING[a] ?? 0) + 1;
+}
+
 // -------------------------------------------------------------------- tables
 
 function buildTables(): Record<string, Row[]> {
@@ -103,6 +117,10 @@ function buildTables(): Record<string, Row[]> {
     ...p,
     avatar_url: avatarDataUri(p.display_name),
     profile_theme: null,
+    account_type: "public",
+    followers_count: FOLLOWERS[p.username] ?? 0,
+    following_count: FOLLOWING[p.username] ?? 0,
+    social_links: {},
     created_at: ago(24 * 30),
     updated_at: ago(24),
   }));
@@ -135,6 +153,8 @@ function buildTables(): Record<string, Row[]> {
       is_reel: isReel,
       is_archived: false,
       circle_id: null,
+      views_count: pseudoCount(id, "view"),
+      pinned_comment_id: null,
       likes_count: 0,
       comments_count: 0,
       created_at: ago(3 + i * 7),
@@ -165,6 +185,8 @@ function buildTables(): Record<string, Row[]> {
       is_reel: true,
       is_archived: false,
       circle_id: null,
+      views_count: pseudoCount(id, "view"),
+      pinned_comment_id: null,
       likes_count: 0,
       comments_count: 0,
       created_at: ago(2 + i * 9),
@@ -386,6 +408,11 @@ function buildTables(): Record<string, Row[]> {
   };
 }
 
+function bumpProfileCount(tables: Record<string, Row[]>, userId: string, field: string, delta: number) {
+  const p = (tables.profiles ?? []).find((x) => x.id === userId);
+  if (p) p[field] = Math.max((p[field] ?? 0) + delta, 0);
+}
+
 /** Stable pseudo-random extra counts so cards feel lively. */
 function pseudoCount(id: string, kind: string): number {
   let h = 0;
@@ -454,6 +481,9 @@ const RELATIONS: MockSeed["relations"] = {
   saved_posts: {
     posts: { column: "post_id", kind: "out", tableName: "posts" },
   },
+  friendships: {
+    profiles: { column: "friend_id", kind: "out", tableName: "profiles" },
+  },
   wallets: {
     profiles: { column: "user_id", kind: "out", tableName: "profiles" },
   },
@@ -468,6 +498,36 @@ function buildRpcs(): NonNullable<MockSeed["rpcs"]> {
     a < b ? `${a}::${b}` : `${b}::${a}`;
 
   return {
+    follow_user: (args, tables, ctx) => {
+      const mine = ctx.getUserId();
+      const target = args.p_target ?? args.target;
+      if (!mine || !target || target === mine) return { ok: false, error: "invalid_target" };
+      const exists = (tables.follows ?? []).some(
+        (f) => f.follower_id === mine && f.following_id === target,
+      );
+      if (!exists) {
+        tables.follows?.push({ follower_id: mine, following_id: target, created_at: ago(0) });
+        bumpProfileCount(tables, target, "followers_count", +1);
+        bumpProfileCount(tables, mine, "following_count", +1);
+      }
+      return { ok: true, following: true };
+    },
+
+    unfollow_user: (args, tables, ctx) => {
+      const mine = ctx.getUserId();
+      const target = args.p_target ?? args.target;
+      if (!mine || !target) return { ok: false, error: "invalid_target" };
+      const before = (tables.follows ?? []).length;
+      tables.follows = (tables.follows ?? []).filter(
+        (f) => !(f.follower_id === mine && f.following_id === target),
+      );
+      if (tables.follows.length < before) {
+        bumpProfileCount(tables, target, "followers_count", -1);
+        bumpProfileCount(tables, mine, "following_count", -1);
+      }
+      return { ok: true, following: false };
+    },
+
     has_role: (args, tables, ctx) => {
       const uidArg = args._user_id ?? args.user_id;
       const roleArg = args._role ?? args.role ?? "user";
