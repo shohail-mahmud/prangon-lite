@@ -153,11 +153,11 @@ const App = () => {
                     <Route path="*" element={<NotFound />} />
                     </Routes>
                   </Suspense>
+                  <DemoIdentitySwitcher />
                   </CallProvider>
                 </RolesProvider>
               </AppSettingsProvider>
             </AuthProvider>
-                            <DemoIdentitySwitcher />
 </BrowserRouter>
         </TooltipProvider>
       </ThemeProvider>
