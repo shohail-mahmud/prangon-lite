@@ -406,6 +406,36 @@ async function handleRest(
       rows.push(row);
       inserted.push(row);
     }
+    // Side effect: accepting a friend request is a follow, so notify the
+    // recipient the way Instagram does — "X started following you".
+    if (table === "friend_requests") {
+      for (const row of inserted) {
+        if (row.status !== "accepted") continue;
+        const notes = ctx.tables["notifications"] ?? (ctx.tables["notifications"] = []);
+        const dupe = notes.some(
+          (n) =>
+            n.type === "follow" &&
+            n.user_id === row.to_user_id &&
+            n.from_user_id === row.from_user_id,
+        );
+        if (dupe) continue;
+        const fromProfile = (ctx.tables["profiles"] ?? []).find(
+          (p) => p.id === row.from_user_id,
+        );
+        notes.push({
+          id: `n-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          user_id: row.to_user_id,
+          from_user_id: row.from_user_id,
+          type: "follow",
+          title: "New follower",
+          message: "started following you",
+          action_url: fromProfile ? `/profile/${fromProfile.username}` : null,
+          is_read: false,
+          created_at: new Date().toISOString(),
+        });
+      }
+    }
+
     const shaped = inserted.map((r) => shapeRow(ctx, table, r, selectParam));
     return jsonResponse(wantsRepresentation ? (acceptObject ? shaped[0] ?? null : shaped) : null, 201);
   }
