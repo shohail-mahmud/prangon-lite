@@ -37,3 +37,10 @@ export interface MockSeed {
   /** Hook to add defaults (ids, timestamps) to incoming rows. */
   prepareRow?: (table: string, row: Row) => Row;
 }
+
+// ---------------------------------------------------------------- mock-only
+// The official announcement account and the post the mock always returns
+// first. Declared here (no side effects) so both mockDb and mockBackend can
+// import them without pulling the seed builder into the interceptor.
+export const PINNED_POST_ID = "p-000";
+export const MOCK_OFFICIAL_USERNAME = "pl_team";
