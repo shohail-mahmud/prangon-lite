@@ -30,6 +30,9 @@ interface Ctx {
   tables: Record<string, Row[]>;
   currentEmail: string | null;
   refreshTokenToEmail: Record<string, string>;
+  host: string;
+  /** uuid of the currently signed-in demo user (from the stored session). */
+  getUserId: () => string | null;
 }
 
 let installed = false;
@@ -55,6 +58,8 @@ export function installMockBackend(getSeed: () => MockSeed): void {
     tables: loadOrSeed(getSeed),
     currentEmail: null,
     refreshTokenToEmail: {},
+    host,
+    getUserId: () => resolveUserId(host, ctx),
   };
 
   patchWebSocket(host);
@@ -266,6 +271,26 @@ function handleAuth(ctx: Ctx, url: URL, method: string, body: any, init: any): R
   return jsonResponse({ message: "ok" });
 }
 
+function resolveUserId(host: string, ctx: Ctx): string | null {
+  if (ctx.currentEmail && ctx.seed.authUsers[ctx.currentEmail]) {
+    return ctx.seed.authUsers[ctx.currentEmail].id;
+  }
+  try {
+    const ref = host.split(".")[0];
+    const raw = localStorage.getItem(`sb-${ref}-auth-token`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const email = parsed?.user?.email;
+    if (email && ctx.seed.authUsers[email]) return ctx.seed.authUsers[email].id;
+    // Seeded uuids map 1:1 to identities; also match by uuid.
+    const id = parsed?.user?.id;
+    if (id) return id;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 function readStoredIdentity(ctx: Ctx): string | null {
   try {
     const id = localStorage.getItem("prangon-lite-identity");
@@ -308,17 +333,12 @@ async function handleRest(
   }
 
   const table = decodeURIComponent(path.split("?")[0]);
-  const rows = ctx.tables[table];
+  let rows = ctx.tables[table];
   if (!rows) {
-    return jsonResponse(
-      {
-        code: "42P01",
-        message: `relation "public.${table}" does not exist (mock)`,
-        details: null,
-        hint: null,
-      },
-      404,
-    );
+    // Unknown table: treat as empty instead of erroring so secondary
+    // features degrade gracefully in mock mode.
+    rows = [];
+    ctx.tables[table] = rows;
   }
 
   const params = url.searchParams;
@@ -413,30 +433,39 @@ async function handleRest(
 // ------------------------------------------------------------------ filters
 
 type Filter = { column: string; op: string; value: string };
+type FilterSet = { filters: Filter[]; orGroups: Filter[][] };
 
-function parseFilters(params: URLSearchParams): Filter[] {
+function parseFilters(params: URLSearchParams): FilterSet {
   const reserved = new Set([
     "select", "order", "limit", "offset", "on_conflict", "columns",
   ]);
-  const filters: Filter[] = [];
+  const set: FilterSet = { filters: [], orGroups: [] };
   params.forEach((rawValue, key) => {
     if (reserved.has(key)) return;
-    const value = decodeURIComponent(rawValue);
+    const value = rawValue;
     if (key === "or") {
       // Minimal support: or=(col.eq.v,col.eq.v)
+      const group: Filter[] = [];
       const inner = value.replace(/^\(|\)$/g, "");
       for (const clause of inner.split(",")) {
-        const m = clause.match(/^([a-zA-Z0-9_.]+)\.(eq|neq|is)\.(.*)$/);
-        if (m) filters.push({ column: m[1], op: `or.${m[2]}`, value: m[3] });
+        const m = clause.match(/^([a-zA-Z0-9_.]+)\.(eq|neq|is|in|gte|lte|gt|lt|like|ilike)\.(.*)$/s);
+        if (m) group.push({ column: m[1], op: m[2], value: m[3] });
       }
+      if (group.length) set.orGroups.push(group);
       return;
     }
-    const m = value.match(/^(eq|neq|gt|gte|lt|lte|like|ilike|is|in|cs|cd|ov)\.(.*)$/s);
+    let negate = false;
+    let v = value;
+    if (v.startsWith("not.")) {
+      negate = true;
+      v = v.slice(4);
+    }
+    const m = v.match(/^(eq|neq|gt|gte|lt|lte|like|ilike|is|in|cs|cd|ov)\.(.*)$/s);
     if (m) {
-      filters.push({ column: key, op: m[1], value: m[2] });
+      set.filters.push({ column: key, op: negate ? `not.${m[1]}` : m[1], value: m[2] });
     }
   });
-  return filters;
+  return set;
 }
 
 function compare(a: any, b: any): number {
@@ -451,21 +480,18 @@ function compare(a: any, b: any): number {
   return String(a).localeCompare(String(b));
 }
 
-function matchesFilters(row: Row, filters: Filter[]): boolean {
-  return filters.every((f) => {
-    const cell = row[f.column];
-    const v = f.value;
-    const orMode = f.op.startsWith("or.");
-    const op = orMode ? f.op.slice(3) : f.op;
-    const hit = matchOne(cell, op, v);
-    if (orMode && hit) return true;
-    if (orMode) {
-      // For `or`, at least one clause must match; track via special marker.
-      (row as any).__orMatched = (row as any).__orMatched || hit;
-      return true;
+function matchesFilters(row: Row, set: FilterSet): boolean {
+  for (const f of set.filters) {
+    if (f.op.startsWith("not.")) {
+      if (matchOne(row[f.column], f.op.slice(4), f.value)) return false;
+      continue;
     }
-    return hit;
-  });
+    if (!matchOne(row[f.column], f.op, f.value)) return false;
+  }
+  for (const group of set.orGroups) {
+    if (!group.some((f) => matchOne(row[f.column], f.op, f.value))) return false;
+  }
+  return true;
 }
 
 function matchOne(cell: any, op: string, rawValue: string): boolean {
@@ -542,7 +568,13 @@ function shapeRow(ctx: Ctx, table: string, row: Row, selectParam: string): Row {
   return out;
 }
 
-type SelectItem = { raw: string; alias?: string; name: string; embed?: SelectItem[] };
+type SelectItem = {
+  raw: string;
+  name: string;
+  alias?: string;
+  relation?: string;
+  embed?: SelectItem[];
+};
 
 function parseSelectList(select: string): SelectItem[] {
   const items: SelectItem[] = [];
@@ -567,7 +599,7 @@ function parseSelectList(select: string): SelectItem[] {
 
 function parseSelectItem(raw: string): SelectItem {
   const s = raw.trim();
-  // alias:relation!hint(cols)  |  relation!hint(cols)  |  relation(cols)  |  col
+  // alias:relation!hint(cols)  |  relation!hint(cols)  |  relation(cols)  |  col | alias:col
   const embedMatch = s.match(/^(?:(.+?):)?([a-zA-Z0-9_!]+)(?:\((.*)\))?$/s);
   if (embedMatch && embedMatch[3] !== undefined) {
     const relation = embedMatch[2].split("!")[0];
@@ -576,12 +608,16 @@ function parseSelectItem(raw: string): SelectItem {
       raw: s,
       name: explicitAlias ?? relation,
       alias: explicitAlias ?? relation,
+      relation,
       embed: parseSelectList(embedMatch[3]),
     };
   }
-  const [namePart, aliasPart] = s.split(":");
-  const name = (aliasPart ?? namePart).trim();
-  return { raw: s, name: aliasPart ? aliasPart.trim() : name, alias: aliasPart ? namePart.trim() : undefined };
+  if (s.includes(":")) {
+    // PostgREST rename syntax: alias:column
+    const [alias, column] = s.split(":");
+    return { raw: s, name: column.trim(), alias: alias.trim() };
+  }
+  return { raw: s, name: s };
 }
 
 function applySelectItem(
@@ -592,13 +628,21 @@ function applySelectItem(
   out: Row,
 ): void {
   if (item.embed) {
-    const relName = item.name;
-    const rel = ctx.seed.relations?.[table]?.[relName];
+    const relName = item.relation ?? item.name;
+    const relTable = ctx.seed.relations?.[table] ?? {};
+    let rel = relTable[relName] ?? (item.alias ? relTable[item.alias] : undefined);
+    let parentTable = relName;
+    if (!rel && item.alias && ctx.tables[item.alias] && relName.endsWith("_id") && row[relName] != null) {
+      // Generic FK-column embedding (e.g. profiles:user_id(...)): the parent
+      // table is the alias, the FK column is the relation name.
+      rel = { column: relName, kind: "out", parentColumn: "id" };
+      parentTable = item.alias;
+    }
     if (!rel) {
       out[item.alias ?? relName] = null;
       return;
     }
-    const relRows = ctx.tables[relName] ?? [];
+    const relRows = ctx.tables[rel.tableName ?? parentTable] ?? [];
     if (rel.kind === "out") {
       const parent = relRows.find(
         (r) => String(r[rel.parentColumn ?? "id"]) === String(row[rel.column]),
