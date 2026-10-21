@@ -19,7 +19,7 @@
  * Writes go to an in-memory store persisted to localStorage so test edits
  * survive reloads. `window.__prangonResetMockData()` restores the seed.
  */
-import type { MockSeed } from "./mockTypes";
+import { PINNED_POST_ID, MOCK_OFFICIAL_USERNAME, type MockSeed } from "./mockTypes";
 
 const MOCK_DB_KEY = "prangon-lite-mock-db-v1";
 
@@ -363,6 +363,23 @@ async function handleRest(
     let result = rows.filter((r) => matchesFilters(r, filters));
     const order = params.get("order");
     result = applyOrder(result, order);
+
+    // Mock-only: the official announcement post always leads the feed.
+    // Kept in the mock so no app-side ordering had to change.
+    if (table === "posts") {
+      const idx = result.findIndex((r) => r.id === PINNED_POST_ID);
+      if (idx > 0) {
+        const [pinned] = result.splice(idx, 1);
+        result.unshift(pinned);
+      }
+    }
+
+    // Mock-only: the official account is not someone to follow, so hide it
+    // from profile listings (Discover / Search). It still resolves when
+    // joined onto its own post, so the feed card stays intact.
+    if (table === "profiles" && !filters.filters.some((f) => f.column === "id")) {
+      result = result.filter((r) => r.username !== MOCK_OFFICIAL_USERNAME);
+    }
     const offset = Number(params.get("offset") ?? 0) || 0;
     const limitParam = params.get("limit");
     const limit = limitParam == null ? Infinity : Number(limitParam);
