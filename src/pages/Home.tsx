@@ -1,0 +1,94 @@
+import { Seo } from "@/components/seo/Seo";
+import { MainLayout } from "@/components/layout/MainLayout";
+import { Stories } from "@/components/home/Stories";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
+import { useRoles } from "@/contexts/RolesContext";
+import { PostCard } from "@/components/home/PostCard";
+import { SuggestedAccounts } from "@/components/home/SuggestedAccounts";
+import { usePersonalizedFeed, type FeedMode } from "@/hooks/useFeed";
+import { PostSkeleton, StorySkeleton } from "@/components/ui/Shimmer";
+import { SmartFeedAd } from "@/components/ads/SmartFeedAd";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+
+const AD_INTERVAL = 7;
+
+const FEED_TABS: { id: FeedMode; label: string }[] = [
+  { id: "foryou", label: "For you" },
+  { id: "friends", label: "Friends" },
+  { id: "latest", label: "Latest" },
+];
+
+/** Latest is the default for everyone; the v2 key drops any pre-existing auto-saved choice. */
+const FEED_MODE_KEY = "feed-mode-v2";
+const DEFAULT_FEED_MODE: FeedMode = "latest";
+
+const readStoredFeedMode = (): FeedMode => {
+  const stored = localStorage.getItem(FEED_MODE_KEY) as FeedMode | null;
+  return FEED_TABS.some((tab) => tab.id === stored) ? (stored as FeedMode) : DEFAULT_FEED_MODE;
+};
+
+const Home = () => {
+  const [mode, setMode] = useState<FeedMode>(readStoredFeedMode);
+  useEffect(() => { localStorage.setItem(FEED_MODE_KEY, mode); }, [mode]);
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = usePersonalizedFeed(mode);
+  const { t } = useTranslation();
+  const { settings } = useAppSettings();
+  const { isAdmin } = useRoles();
+  const showStories = isAdmin || settings.stories_enabled !== false;
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const posts = useMemo(() => data?.pages.flatMap((p) => p.posts) ?? [], [data]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !isFetchingNextPage) fetchNextPage();
+      },
+      { rootMargin: "600px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  return (
+    <MainLayout>
+      <Seo title="Prangon — Next-Generation Social Networking" description="Share moments, create reels, join private Circles and chat in real time on Prangon" path="/" />
+      <div className="min-h-screen">
+        <h1 className="sr-only">Your Prangon Feed</h1>
+        {showStories && <div className="max-w-[640px] mx-auto">{isLoading ? <div className="p-4"><StorySkeleton /></div> : <Stories />}</div>}
+        <div className="max-w-[640px] mx-auto px-0 sm:px-3"><div className="px-4 sm:px-0 py-2"><SuggestedAccounts /></div></div>
+        <div className="max-w-[640px] mx-auto px-3 sm:px-4 py-4 space-y-5">
+          <div role="tablist" aria-label="Feed filter" className="flex gap-1 p-1 rounded-full bg-muted/70 w-full">
+            {FEED_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                role="tab"
+                aria-selected={mode === tab.id}
+                onClick={() => setMode(tab.id)}
+                className={`flex-1 h-9 rounded-full text-sm font-semibold transition-all ${mode === tab.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          <SmartFeedAd placement="home_feed" className="rounded-[20px] overflow-hidden" />
+          {isLoading ? <div className="space-y-5"><PostSkeleton /><PostSkeleton /><PostSkeleton /></div> : posts.length === 0 ? (
+            <div className="empty-state border border-dashed border-border/60 rounded-[28px] bg-card/50 backdrop-blur-sm py-20"><div className="empty-state-icon"><span className="text-2xl">📸</span></div><p className="text-[15px] font-medium text-foreground">No posts yet</p><p className="text-sm text-muted-foreground mt-1 max-w-[260px] mx-auto">{t("home.noPosts")} Follow people to see their moments here.</p></div>
+          ) : posts.map((post: any, index: number) => (
+            <Fragment key={post.id}>
+              <PostCard id={post.id} author={{ name: post.profiles?.display_name || post.profiles?.username || "Unknown", username: post.profiles?.username || "unknown", avatar: post.profiles?.avatar_url || undefined, isVerified: post.profiles?.is_verified ?? false, userId: post.user_id, profileTheme: (post.profiles as any)?.profile_theme || 'default' }} content={post.caption || ""} image={post.media_type === "image" ? post.media_url || undefined : undefined} video={post.media_type === "video" ? post.media_url || undefined : undefined} mediaItems={post.post_media} likes={post.likes_count} comments={post.comments_count} timestamp={post.created_at} />
+              {(index + 1) % AD_INTERVAL === 0 && index < posts.length - 1 && <SmartFeedAd key={`ad-${index}`} placement="home_feed" className="rounded-[28px] overflow-hidden border border-border/50" />}
+            </Fragment>
+          ))}
+          {isFetchingNextPage && <PostSkeleton />}
+          <div ref={sentinelRef} className="h-1" aria-hidden="true" />
+        </div>
+      </div>
+    </MainLayout>
+  );
+};
+
+export default Home;
