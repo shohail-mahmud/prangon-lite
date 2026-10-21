@@ -90,12 +90,15 @@ export const TopHeader = memo(() => {
           <Link to="/" className="flex min-w-0 shrink items-center gap-2 pl-0.5 sm:pl-1 lg-press lg-focus rounded-full group overflow-hidden">
             <img
               src={prangonLogo}
-              alt="Prangon"
+              alt="Prangon Lite"
               className="pointer-events-none h-[22px] sm:h-[30px] w-auto max-w-[90px] sm:max-w-none shrink select-none object-contain object-left transition-transform duration-200 group-hover:scale-[1.02]"
               decoding="async"
               draggable={false}
               onContextMenu={(e) => e.preventDefault()}
             />
+            <span className="pointer-events-none shrink-0 select-none rounded-full bg-primary/12 px-1.5 py-[1px] text-[9px] font-bold uppercase leading-tight tracking-[0.08em] text-primary sm:text-[10px]">
+              Lite
+            </span>
           </Link>
         </div>
 
