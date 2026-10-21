@@ -318,12 +318,6 @@ const Settings = () => {
       <div className="space-y-0.5">
         <Row icon={Info} label="Email" description={user?.email || "No email on this identity"} />
       </div>
-
-      <SectionLabel>Privacy & visibility</SectionLabel>
-      <p className="px-3 pb-1 text-xs text-muted-foreground">
-        All Prangon Lite profiles are public — anyone can see posts and follow
-        instantly. There is no private-account mode in Lite.
-      </p>
     </div>
   );
 
