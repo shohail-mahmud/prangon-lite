@@ -30,6 +30,9 @@ interface Ctx {
   tables: Record<string, Row[]>;
   currentEmail: string | null;
   refreshTokenToEmail: Record<string, string>;
+  host: string;
+  /** uuid of the currently signed-in demo user (from the stored session). */
+  getUserId: () => string | null;
 }
 
 let installed = false;
@@ -55,6 +58,8 @@ export function installMockBackend(getSeed: () => MockSeed): void {
     tables: loadOrSeed(getSeed),
     currentEmail: null,
     refreshTokenToEmail: {},
+    host,
+    getUserId: () => resolveUserId(host, ctx),
   };
 
   patchWebSocket(host);
@@ -264,6 +269,26 @@ function handleAuth(ctx: Ctx, url: URL, method: string, body: any, init: any): R
   }
 
   return jsonResponse({ message: "ok" });
+}
+
+function resolveUserId(host: string, ctx: Ctx): string | null {
+  if (ctx.currentEmail && ctx.seed.authUsers[ctx.currentEmail]) {
+    return ctx.seed.authUsers[ctx.currentEmail].id;
+  }
+  try {
+    const ref = host.split(".")[0];
+    const raw = localStorage.getItem(`sb-${ref}-auth-token`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const email = parsed?.user?.email;
+    if (email && ctx.seed.authUsers[email]) return ctx.seed.authUsers[email].id;
+    // Seeded uuids map 1:1 to identities; also match by uuid.
+    const id = parsed?.user?.id;
+    if (id) return id;
+  } catch {
+    /* ignore */
+  }
+  return null;
 }
 
 function readStoredIdentity(ctx: Ctx): string | null {
@@ -533,7 +558,13 @@ function shapeRow(ctx: Ctx, table: string, row: Row, selectParam: string): Row {
   return out;
 }
 
-type SelectItem = { raw: string; alias?: string; name: string; embed?: SelectItem[] };
+type SelectItem = {
+  raw: string;
+  name: string;
+  alias?: string;
+  relation?: string;
+  embed?: SelectItem[];
+};
 
 function parseSelectList(select: string): SelectItem[] {
   const items: SelectItem[] = [];
@@ -558,7 +589,7 @@ function parseSelectList(select: string): SelectItem[] {
 
 function parseSelectItem(raw: string): SelectItem {
   const s = raw.trim();
-  // alias:relation!hint(cols)  |  relation!hint(cols)  |  relation(cols)  |  col
+  // alias:relation!hint(cols)  |  relation!hint(cols)  |  relation(cols)  |  col | alias:col
   const embedMatch = s.match(/^(?:(.+?):)?([a-zA-Z0-9_!]+)(?:\((.*)\))?$/s);
   if (embedMatch && embedMatch[3] !== undefined) {
     const relation = embedMatch[2].split("!")[0];
@@ -567,12 +598,16 @@ function parseSelectItem(raw: string): SelectItem {
       raw: s,
       name: explicitAlias ?? relation,
       alias: explicitAlias ?? relation,
+      relation,
       embed: parseSelectList(embedMatch[3]),
     };
   }
-  const [namePart, aliasPart] = s.split(":");
-  const name = (aliasPart ?? namePart).trim();
-  return { raw: s, name: aliasPart ? aliasPart.trim() : name, alias: aliasPart ? namePart.trim() : undefined };
+  if (s.includes(":")) {
+    // PostgREST rename syntax: alias:column
+    const [alias, column] = s.split(":");
+    return { raw: s, name: column.trim(), alias: alias.trim() };
+  }
+  return { raw: s, name: s };
 }
 
 function applySelectItem(
@@ -583,13 +618,18 @@ function applySelectItem(
   out: Row,
 ): void {
   if (item.embed) {
-    const relName = item.name;
-    const rel = ctx.seed.relations?.[table]?.[relName];
+    const relName = item.relation ?? item.name;
+    const relTable = ctx.seed.relations?.[table] ?? {};
+    let rel = relTable[relName] ?? (item.alias ? relTable[item.alias] : undefined);
+    if (!rel && relName.endsWith("_id") && row[relName] != null) {
+      // Generic FK-column embedding (e.g. profiles:user_id(...)).
+      rel = { column: relName, kind: "out", parentColumn: "id" };
+    }
     if (!rel) {
       out[item.alias ?? relName] = null;
       return;
     }
-    const relRows = ctx.tables[relName] ?? [];
+    const relRows = ctx.tables[rel.tableName ?? relName] ?? [];
     if (rel.kind === "out") {
       const parent = relRows.find(
         (r) => String(r[rel.parentColumn ?? "id"]) === String(row[rel.column]),
