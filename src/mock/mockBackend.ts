@@ -194,7 +194,7 @@ function jsonResponse(data: any, status = 200, headers: Record<string, string> =
 
 // --------------------------------------------------------------------- auth
 
-function handleAuth(ctx: Ctx, url: URL, method: string, body: any, init: any): Promise<Response> {
+function handleAuth(ctx: Ctx, url: URL, method: string, body: any, init: any): Response {
   const path = url.pathname;
 
   if (path === "/auth/v1/token" && method === "POST") {
@@ -638,7 +638,7 @@ function shapeSubset(row: Row, items: SelectItem[]): Row {
 
 // ------------------------------------------------------------------ storage
 
-function handleStorage(url: URL, method: string, init: any): Promise<Response> {
+function handleStorage(url: URL, method: string, init: any): Response {
   if (method === "POST" && url.pathname.endsWith("/object/list")) {
     return jsonResponse([]);
   }
