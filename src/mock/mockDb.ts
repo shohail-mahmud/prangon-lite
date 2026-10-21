@@ -7,7 +7,7 @@
  * in-memory (persisted to localStorage by the mock engine) — no database.
  * `window.__prangonResetMockData()` restores this seed.
  */
-import type { MockSeed, Row } from "./mockTypes";
+import { PINNED_POST_ID, type MockSeed, type Row } from "./mockTypes";
 import { avatarDataUri, coverDataUri, photoUrl } from "./placeholderImages";
 
 // ---------------------------------------------------------------- identities
@@ -27,10 +27,15 @@ const ago = (h: number, m = 0) =>
 const ahead = (h: number) =>
   new Date(Date.now() + h * 3600 * 1000).toISOString();
 
+// Official announcement account. Kept out of Discover / Search listings.
+// Declared before PEOPLE because PEOPLE references it at module init.
+const PL_TEAM = uid();
+
 export const PEOPLE: Row[] = [
   { id: DEMO_A, username: "demo_a", display_name: "Demo User A", bio: "The default demo identity.", is_verified: false },
   { id: DEMO_B, username: "demo_b", display_name: "Demo User B", bio: "Follow and message this account to test relationships.", is_verified: true },
   { id: DEMO_C, username: "demo_c", display_name: "Demo User C", bio: "Useful for testing list counts and a second conversation.", is_verified: false },
+  { id: PL_TEAM, username: "pl_team", display_name: "Prangon Lite Team", bio: "Official announcements for Prangon Lite.", is_verified: true },
   { id: uid(), username: "ayesha_r", display_name: "Ayesha Rahman", bio: "Photographer. Chasing golden hour in Old Dhaka.", is_verified: true },
   { id: uid(), username: "tanvir_k", display_name: "Tanvir Karim", bio: "Reels about street food. Modest about it.", is_verified: false },
   { id: uid(), username: "nusrat_j", display_name: "Nusrat Jahan", bio: "Poetry, plants, and long bus rides.", is_verified: false },
@@ -142,6 +147,46 @@ function buildTables(): Record<string, Row[]> {
   ];
   const posts: Row[] = [];
   const postMedia: Row[] = [];
+
+  // ------------------------------------------- official announcement post
+  // Always surfaced first by the mock (see mockBackend.ts). Caption is kept
+  // verbatim, including the URL — RenderMentions turns it into a link.
+  const WELCOME_CAPTION = [
+    "Hey! Welcome to Prangon Lite 👋",
+    "",
+    "Prangon Lite is an independent project based on [©Prangon](https://prangon.lovable.app) (the original platform created and owned by Prince Hq). All credit for the original goes to them. This is a separate build in that spirit, not an official release.",
+    "",
+    "The system is now running in demo mode.",
+    "",
+    "Everything you see at the moment is mock data stored locally in your browser. Nothing gets sent to a real server, no sign up is required and you can wipe it and reset it at any time. It's there so you can play with the interface without having to touch a real account.",
+    "",
+    "What's the objective of Prangon Lite?",
+    "",
+    "Prangon Lite was created to give you the most stable and optimised version of Prangon. The original is a big, ambitious piece of software. Lite takes the opposite approach. It's a small, fast, reliable core: loads quicker, runs lighter and is easier to trust.",
+    "",
+    "What does that mean in practice?",
+    "",
+    "Prangon Lite has very few features (intentionally so) and is all about the basics. It's entirely independent of Prangon in that it has its own codebase, its own data and its own deployment. Nothing here impacts the original and nothing from the original makes it into this app.",
+    "",
+    "Thanks for dropping by, have a browse.",
+  ].join("\n");
+
+  posts.push({
+    id: PINNED_POST_ID,
+    user_id: PL_TEAM,
+    caption: WELCOME_CAPTION,
+    media_url: null,
+    media_type: null,
+    is_reel: false,
+    is_archived: false,
+    circle_id: null,
+    views_count: pseudoCount(PINNED_POST_ID, "view"),
+    pinned_comment_id: null,
+    likes_count: 0,
+    comments_count: 0,
+    created_at: ago(1),
+    updated_at: ago(1),
+  });
   postDefs.forEach(([author, caption, media, isReel], i) => {
     const id = `p-${String(i + 1).padStart(3, "0")}`;
     posts.push({
