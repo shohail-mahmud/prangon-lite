@@ -72,26 +72,27 @@ export const SearchFriends = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {searchResults.map((profile) => (
             <Card key={profile.id} className="p-4 rounded-2xl">
-              <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center gap-3">
                 <Avatar>
                   <AvatarImage src={profile.avatar_url || ""} />
                   <AvatarFallback>
                     <UserCircle className="h-8 w-8" />
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex-1">
-                  <h3 className="font-semibold">{profile.display_name || profile.username}</h3>
-                  <p className="text-sm text-muted-foreground">@{profile.username}</p>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold truncate">{profile.display_name || profile.username}</h3>
+                  <p className="text-sm text-muted-foreground truncate">@{profile.username}</p>
                 </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="shrink-0 rounded-xl"
+                  onClick={() => sendRequestMutation.mutate(profile.id)}
+                >
+                  <UserPlus className="h-4 w-4 mr-1" />
+                  Follow
+                </Button>
               </div>
-              <Button
-                size="sm"
-                className="w-full rounded-xl"
-                onClick={() => sendRequestMutation.mutate(profile.id)}
-              >
-                <UserPlus className="h-4 w-4 mr-1" />
-                Follow
-              </Button>
             </Card>
           ))}
         </div>
