@@ -264,11 +264,11 @@ function buildTables(): Record<string, Row[]> {
 
   // --------------------------------------------------------- notifications
   const notifications: Row[] = [
-    { id: "n-001", user_id: U.demo_a, from_user_id: U.demo_b, type: "like", title: "New like", message: "Demo User B liked your post", action_url: "/post/p-007", is_read: false, created_at: ago(9) },
-    { id: "n-002", user_id: U.demo_a, from_user_id: U.demo_b, type: "comment", title: "New comment", message: "Demo User B commented: Hi back 👋", action_url: "/post/p-007", is_read: false, created_at: ago(10) },
-    { id: "n-003", user_id: U.demo_a, from_user_id: U.demo_b, type: "friend_request", title: "Friend request", message: "Demo User B sent you a friend request", action_url: "/friends", is_read: false, created_at: ago(26) },
-    { id: "n-004", user_id: U.demo_a, from_user_id: U.demo_c, type: "friend_accept", title: "Friend accepted", message: "Demo User C accepted your friend request", action_url: "/profile/demo_c", is_read: true, created_at: ago(85) },
-    { id: "n-005", user_id: U.demo_b, from_user_id: U.demo_a, type: "like", title: "New like", message: "Demo User A liked your post", action_url: "/post/p-007", is_read: false, created_at: ago(9) },
+    { id: "n-001", user_id: U.demo_a, from_user_id: U.demo_b, type: "like", title: "New like", message: "liked your post", action_url: "/post/p-007", is_read: false, created_at: ago(9) },
+    { id: "n-002", user_id: U.demo_a, from_user_id: U.demo_b, type: "comment", title: "New comment", message: "commented: Hi back 👋", action_url: "/post/p-007", is_read: false, created_at: ago(10) },
+    { id: "n-003", user_id: U.demo_a, from_user_id: U.demo_b, type: "follow", title: "New follower", message: "started following you", action_url: "/profile/demo_b", is_read: false, created_at: ago(26) },
+    { id: "n-004", user_id: U.demo_a, from_user_id: U.demo_c, type: "friend_accept", title: "Friend accepted", message: "accepted your friend request", action_url: "/profile/demo_c", is_read: true, created_at: ago(85) },
+    { id: "n-005", user_id: U.demo_b, from_user_id: U.demo_a, type: "like", title: "New like", message: "liked your post", action_url: "/post/p-007", is_read: false, created_at: ago(9) },
   ];
 
   // --------------------------------------------------------------- stories
@@ -483,6 +483,11 @@ const RELATIONS: MockSeed["relations"] = {
   },
   friendships: {
     profiles: { column: "friend_id", kind: "out", tableName: "profiles" },
+  },
+  friend_requests: {
+    profiles: { column: "from_user_id", kind: "out", tableName: "profiles" },
+    from_user: { column: "from_user_id", kind: "out", tableName: "profiles" },
+    to_user: { column: "to_user_id", kind: "out", tableName: "profiles" },
   },
   wallets: {
     profiles: { column: "user_id", kind: "out", tableName: "profiles" },
