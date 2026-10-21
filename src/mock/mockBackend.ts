@@ -621,15 +621,18 @@ function applySelectItem(
     const relName = item.relation ?? item.name;
     const relTable = ctx.seed.relations?.[table] ?? {};
     let rel = relTable[relName] ?? (item.alias ? relTable[item.alias] : undefined);
-    if (!rel && relName.endsWith("_id") && row[relName] != null) {
-      // Generic FK-column embedding (e.g. profiles:user_id(...)).
+    let parentTable = relName;
+    if (!rel && item.alias && ctx.tables[item.alias] && relName.endsWith("_id") && row[relName] != null) {
+      // Generic FK-column embedding (e.g. profiles:user_id(...)): the parent
+      // table is the alias, the FK column is the relation name.
       rel = { column: relName, kind: "out", parentColumn: "id" };
+      parentTable = item.alias;
     }
     if (!rel) {
       out[item.alias ?? relName] = null;
       return;
     }
-    const relRows = ctx.tables[rel.tableName ?? relName] ?? [];
+    const relRows = ctx.tables[rel.tableName ?? parentTable] ?? [];
     if (rel.kind === "out") {
       const parent = relRows.find(
         (r) => String(r[rel.parentColumn ?? "id"]) === String(row[rel.column]),

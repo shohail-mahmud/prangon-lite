@@ -6,6 +6,8 @@ export type Row = Record<string, any>;
 export interface MockRelation {
   /** FK column on one of the two tables. */
   column: string;
+  /** Related table name (defaults to the name used in the select). */
+  tableName?: string;
   /** PK column on the other side (defaults to "id"). */
   parentColumn?: string;
   /**
