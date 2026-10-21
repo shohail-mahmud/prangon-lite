@@ -169,12 +169,12 @@ function buildTables(): Record<string, Row[]> {
     }
   });
   // Reels.
-  const reelDefs: Array<[string, string, number, number, number]> = [
-    ["tanvir_k", "60-second biryani trail — part 4 🍛", 1, 120, 14],
-    ["ayesha_r", "Slow morning in the old city ☕", 2, 89, 6],
-    ["shafin_m", "Last-over sixes compilation 🏏", 0, 210, 22],
+  const reelDefs: Array<[string, string, number]> = [
+    ["tanvir_k", "60-second biryani trail — part 4 🍛", 1],
+    ["ayesha_r", "Slow morning in the old city ☕", 2],
+    ["shafin_m", "Last-over sixes compilation 🏏", 0],
   ];
-  reelDefs.forEach(([author, caption, vidIdx, reelLikes, reelComments], i) => {
+  reelDefs.forEach(([author, caption, vidIdx], i) => {
     const id = `r-${String(i + 1).padStart(3, "0")}`;
     posts.push({
       id,
