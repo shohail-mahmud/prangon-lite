@@ -2,12 +2,16 @@
  * Prangon Lite — mock backend installer (dev/testing only).
  *
  * Imported at the very top of src/main.tsx so the interceptors are in place
- * before the app creates its Supabase client. When VITE_USE_MOCK_DATA is not
- * 'true' this does nothing and the app behaves exactly as shipped.
+ * before the app creates its Supabase client.
+ *
+ * Enabled automatically when no real Supabase credentials are configured, so a
+ * deployment with zero environment variables still boots as a working demo
+ * instead of showing a blank screen. See src/lib/backendMode.ts.
  */
+import { usingMockData } from "@/lib/backendMode";
 import { installMockBackend } from "./mockBackend";
 import { createSeed } from "./mockDb";
 
-if (import.meta.env.VITE_USE_MOCK_DATA === "true") {
+if (usingMockData) {
   installMockBackend(createSeed);
 }
